@@ -16,3 +16,5 @@ backups/*
 docs/temp/*
 
 docker-compose.override.yml
+
+rest/verificar_lead.http
