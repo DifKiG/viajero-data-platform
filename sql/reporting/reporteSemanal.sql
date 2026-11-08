@@ -41,7 +41,7 @@ LANGUAGE sql STABLE AS $f$
     FROM ult u
     WHERE COALESCE(u.payload->>'is_deleted','false') <> 'true'
   ),
-  v AS (SELECT * FROM l WHERE fecha_compra >= p_desde AND fecha_compra < p_hasta_excl),
+  v AS (SELECT * FROM l WHERE fecha_compra >= p_desde AND fecha_compra < p_hasta_excl AND COALESCE(precio, 0) > 0),   -- venta nueva = con fecha de compra en el rango Y presupuesto > 0 (sin valor de plan = posible abono)
   vc AS (
     SELECT DISTINCT ON (v.lead_id) v.lead_id, (c->>'id')::bigint AS contact_id
     FROM v, jsonb_array_elements(CASE WHEN jsonb_typeof(v.contactos)='array' THEN v.contactos ELSE '[]'::jsonb END) c
@@ -251,25 +251,3 @@ BEGIN
   RETURN NEXT;
 END;
 $f$;
-SELECT whatsapp FROM reporte.mensual('2026-10-15');
-
-/*SELECT f->>'field_id' AS field_id, f->>'field_name' AS nombre, f->>'field_type' AS tipo,
-       count(DISTINCT (r.payload->>'id')::bigint) AS leads_con_dato
-FROM staging.leads_raw r,
-     jsonb_array_elements(CASE WHEN jsonb_typeof(r.payload->'custom_fields_values') = 'array'
-                               THEN r.payload->'custom_fields_values' ELSE '[]'::jsonb END) f
-WHERE r.extracted_at >= now() - interval '30 days'
-  AND f->>'field_name' ~* 'plan|incremento|proveedor|pagado|pago|saldo'
-GROUP BY 1, 2, 3
-ORDER BY 2;*/
-
-SELECT CASE WHEN f->>'field_id' IN ('1039825','1039823','1039827') THEN 'SAC 10398xx'
-            WHEN f->>'field_id' IN ('1044180','1044182','1044184') THEN 'SAC 10441xx' END AS set_sac,
-       (r.payload->>'pipeline_id') AS pipeline, count(DISTINCT (r.payload->>'id')::bigint) AS leads,
-       min(to_timestamp((r.payload->>'updated_at')::bigint))::date AS desde,
-       max(to_timestamp((r.payload->>'updated_at')::bigint))::date AS hasta
-FROM staging.leads_raw r,
-     jsonb_array_elements(CASE WHEN jsonb_typeof(r.payload->'custom_fields_values')='array' THEN r.payload->'custom_fields_values' ELSE '[]'::jsonb END) f
-WHERE r.extracted_at >= now() - interval '60 days'
-  AND f->>'field_id' IN ('1039825','1039823','1039827','1044180','1044182','1044184')
-GROUP BY 1, 2 ORDER BY 1, 2;
